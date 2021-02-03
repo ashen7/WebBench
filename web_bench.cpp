@@ -28,25 +28,25 @@ using std::endl;
 //请求大小
 #define REQUEST_SIZE 2048  
 
-int force = 0;             //默认需要等待服务器响应
-int force_reload = 0;      //默认不重新发送请求
-int clients_num = 1;       //默认客户端数量
-int request_time = 30;     //默认模拟请求时间
-int http_version = 2;      //默认http协议版本 0:http/0.9, 1:http/1.0, 2:http/1.1
-char* proxy_host = NULL;   //默认无代理服务器
-int port = 80;             //默认访问80端口 
-int is_keep_alive = 0;     //默认不支持keep alive
+static int force = 0;             //默认需要等待服务器响应
+static int force_reload = 0;      //默认不重新发送请求
+static int clients_num = 1;       //默认客户端数量
+static int request_time = 30;     //默认模拟请求时间
+static int http_version = 2;      //默认http协议版本 0:http/0.9, 1:http/1.0, 2:http/1.1
+static char* proxy_host = NULL;   //默认无代理服务器
+static int port = 80;             //默认访问80端口 
+static int is_keep_alive = 0;     //默认不支持keep alive
 
-int request_method = METHOD_GET;  //默认请求方法
-int pipeline[2];                  //用于父子进程通信的管道
-char host[MAXHOSTNAMELEN];        //存放目标服务器的网络地址
-char request_buf[REQUEST_SIZE];   //存放请求报文的字节流
+static int request_method = METHOD_GET;  //默认请求方法
+static int pipeline[2];                  //用于父子进程通信的管道
+static char host[MAXHOSTNAMELEN];        //存放目标服务器的网络地址
+static char request_buf[REQUEST_SIZE];   //存放请求报文的字节流
 
-int success_count = 0;    //请求成功的次数
-int failed_count = 0;     //失败的次数
-int total_bytes = 0;     //服务器响应总字节数
+static int success_count = 0;    //请求成功的次数
+static int failed_count = 0;     //失败的次数
+static int total_bytes = 0;     //服务器响应总字节数
 
-volatile bool timeout = false;    //子进程访问服务器 是否超时
+volatile bool is_expired = false;    //子进程访问服务器 是否超时
 
 static void Usage() {
 	fprintf(stderr,
@@ -390,7 +390,7 @@ static void BuildRequest(const char* url) {
 
 //闹钟信号处理函数
 static void AlarmHandler(int signal) {
-	timeout = true;
+	is_expired = true;
 }	
 
 //子进程创建客户端去请求服务器
@@ -417,8 +417,8 @@ static void Worker(const char* server_host, const int server_port, const char* r
         //cout << "1. 建立连接（TCP三次握手）成功!" << endl;
 keep_alive:
         while(true) {
-            if (timeout) {
-                //到收到闹钟信号会使timeout为true 此时子进程工作应该结束了(每个子进程都有一个timeout)
+            if (is_expired) {
+                //到收到闹钟信号会使is_expired为true 此时子进程工作应该结束了(每个子进程都有一个is_expired)
                 if (failed_count > 0) {
                     failed_count--;
                 }
@@ -449,7 +449,7 @@ keep_alive:
                 //keep-alive一个进程只创建一个套接字 收发数据都用这个套接字
                 //读服务器返回的响应报文到response_buf中
                 while (true) {
-                    if (timeout) {
+                    if (is_expired) {
                         break;
                     } 
                     int read_bytes = read(client_sockfd, response_buf, response_size);
@@ -472,8 +472,8 @@ keep_alive:
     } else {
 not_keep_alive:
         while(true) {
-            if (timeout) {
-                //到收到闹钟信号会使timeout为true 此时子进程工作应该结束了(每个子进程都有一个timeout)
+            if (is_expired) {
+                //到收到闹钟信号会使is_expired为true 此时子进程工作应该结束了(每个子进程都有一个is_expired)
                 if (failed_count > 0) {
                     failed_count--;
                 }
@@ -512,7 +512,7 @@ not_keep_alive:
                 //not-keey-alive 每次发送完请求，读取了响应后就关闭套接字
                 //下次创建新套接字 发送请求 读取响应
                 while (true) {
-                    if (timeout) {
+                    if (is_expired) {
                         break;
                     } 
                     int read_bytes = read(client_sockfd, response_buf, response_size);
@@ -543,7 +543,7 @@ not_keep_alive:
 }
 
 //父进程的作用: 创建子进程 读子进程测试到的数据 然后处理
-static void StressTest() {
+static void WebBench() {
 	pid_t pid = 0;
 	FILE* pipe_fd = NULL;
 	int req_succ, req_fail, resp_bytes;
@@ -625,8 +625,8 @@ static void StressTest() {
 		}
 		fclose(pipe_fd);
 
-		printf("\n速度: %d 请求/分钟, %d 字节/秒.\n请求: %d 成功, %d 失败\n",
-				(int)((success_count + failed_count) / (request_time / 60.0f)),
+		printf("\n速度: %d 请求/秒, %d 字节/秒.\n请求: %d 成功, %d 失败\n",
+				(int)((success_count + failed_count) / (float)request_time),
 				(int)(total_bytes / (float)request_time),
 				success_count, failed_count);
 	}
@@ -641,7 +641,7 @@ int main(int argc, char* argv[]) {
 	BuildRequest(url);
 
 	//开始执行压力测试
-	StressTest();
+	WebBench();
 
 	return 0;
 }
