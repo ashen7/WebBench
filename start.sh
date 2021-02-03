@@ -1,5 +1,6 @@
 #!/bin/bash
 
+webbench=./web_bench
 #服务器地址
 server_ip=192.168.110.19
 server_port=8888
@@ -11,6 +12,21 @@ process_num=1
 request_time=60
 #keep-alive
 is_keep_alive=1
+#force
+is_force=0
+
+#命令行选项
+options="-c $process_num -t $request_time $url"
+
+if [ $is_force -eq 1 ]
+then
+    options="-f $options" 
+fi 
+
+if [ $is_keep_alive -eq 1 ]
+then
+    options="-k $options" 
+fi 
 
 #编译
 make clean && make -j8
@@ -19,11 +35,6 @@ make clean && make -j8
 kill -9 `ps -ef | grep web_bench | awk '{print $2}'`
 
 #运行
-if [ $is_keep_alive -eq 1 ]
-then
-    ./web_bench -k -c $process_num -t $request_time $url
-else
-    ./web_bench -c $process_num -t $request_time $url
-fi 
+$webbench $options
 
 
