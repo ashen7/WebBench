@@ -1,7 +1,8 @@
 # WebBench
+
 ## introduction
 * WebBench是Web性能压力测试工具。使用fork()系统调用创建多个子进程，模拟客户端去访问指定服务器。
-* 支持HTTP/0.9, HTTP/1.0, HTTP1.1请求，最终输出 请求/秒(原本是请求/分钟)，字节/秒等信息。
+* 支持HTTP/0.9, HTTP/1.0, HTTP1.1请求，最终输出: 请求/秒，字节/秒。
 * 本项目使用C++11实现，源码放在一个文件，详细的中文注释。
 * 修复了WebBench connect()失败时sockfd泄漏的bug，以及连续read二次阻塞的bug。
 * 支持HTTP1.1 Connection: keep-alive。
@@ -17,7 +18,7 @@
 
 ## Usage
     ./web_bench [-c process_num] [t $request_time] url 
-    可以修改./start.sh后直接运行，
+    可以修改start.sh后直接运行，
 
 ## 还有其他命令行选项：
 * -k:           keep-alive
