@@ -1,6 +1,6 @@
 # WebBench
 
-## introduction
+## Introduction
 * WebBench是Web性能压力测试工具。使用fork()系统调用创建多个子进程，模拟客户端去访问指定服务器。
 * 支持HTTP/0.9, HTTP/1.0, HTTP1.1请求，最终输出: 请求/秒，字节/秒。
 * 本项目使用C++11实现，核心实现在web_bench.cpp，可以生成静态库和动态库提供api调用，详细的中文注释。
