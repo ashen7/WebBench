@@ -89,92 +89,6 @@ static const struct option OPTIONS[] = {
 	{NULL,      	0,                NULL,                 0}
 };
 
-//命令行解析
-static void ParseArg(int argc, char* argv[]) {
-	int opt = 0;
-	int options_index = 0;
-
-	//没有输入选项
-	if (argc == 1) {
-		Usage();
-		exit(1);
-	} 
-
-	//一个一个解析输入选项
-	while ((opt = getopt_long(argc, argv, "fr912kt:c:p:Vh?",
-								OPTIONS, &options_index)) != EOF) {
-		switch (opt) {
-			case 'f': 
-				force = 1;
-				break;
-			case 'r': 
-				force_reload = 1;
-				break; 
-			case '9': 
-				http_version = 0;
-				break;
-			case '1': 
-				http_version = 1;
-				break;
-			case '2': 
-				http_version = 2;
-				break;
-			case 'k':
-				is_keep_alive = 1;
-				break;
-			case 't': 
-				request_time = atoi(optarg);
-				break;	
-			case 'c': 
-				clients_num = atoi(optarg);
-				break;
-			case 'p': {
-				//使用代理服务器 设置其代理网络号和端口号
-				char* proxy = strrchr(optarg, ':');
-				proxy_host = optarg;
-				if (proxy == NULL) {
-					break;
-				}
-				if (proxy == optarg) {
-					fprintf(stderr,"选项参数错误, 代理服务器%s: 缺少主机名\n", optarg);
-					exit(1);
-				}
-				if (proxy == optarg + strlen(optarg) - 1) {
-					fprintf(stderr,"选项参数错误, 代理服务器%s: 缺少端口号\n", optarg);
-					exit(1);
-				}
-				*proxy = '\0';
-				port = atoi(proxy + 1);
-				break;
-			}
-			case '?':
-			case 'h': 
-				Usage();
-				exit(0);
-			case 'V': 
-				printf("WebBench %s\n", WEBBENCH_VERSION);
-				exit(0);
-			default:
-				Usage();
-				exit(1);
-		}
-	}
-
-	//没有输入URL
-	if (optind == argc) {
-		fprintf(stderr,"WebBench: 缺少URL参数!\n");
-		Usage();
-		exit(1);
-	}
-
-	//如果没有设置客户端数量和连接时间, 则设置默认
-	if (clients_num == 0) {
-		clients_num = 1;
-	}
-	if (request_time == 0) {
-		request_time = 30;
-	}
-}
 
 //打印消息
 static void PrintMessage(const char* url) {
@@ -257,136 +171,6 @@ static int ConnectServer(const char* server_host, int server_port) {
 	return client_sockfd;
 }
 
-//构造请求
-static void BuildRequest(const char* url) {
-	bzero(host, MAXHOSTNAMELEN);
-	bzero(request_buf, REQUEST_SIZE);
-
-	//无缓存和代理都要在http1.0以上才能使用
-	if (force_reload && proxy_host != NULL && http_version < 1) {
-		http_version = 1;
-	}
-	if (request_method == METHOD_HEAD && http_version < 1) {
-		http_version = 1;
-	}
-	//OPTIONS和TRACE要1.1
-	if (request_method == METHOD_OPTIONS && http_version < 2) {
-		http_version = 2;
-	}
-	if (request_method == METHOD_TRACE && http_version < 2) {
-		http_version = 2;
-	}
-
-	//http请求行 的请求方法
-	switch (request_method) {
-		case METHOD_GET: 
-			strcpy(request_buf, "GET");
-			break;
-		case METHOD_HEAD: 
-			strcpy(request_buf, "HEAD");
-			break;
-		case METHOD_OPTIONS: 
-			strcpy(request_buf, "OPTIONS");
-			break;
-		case METHOD_TRACE: 
-			strcpy(request_buf, "TRACE");
-			break;
-		default:
-			strcpy(request_buf, "GET");
-			break;
-	}
-	strcat(request_buf, " ");
-
-	//判断url是否有效
-	if (NULL == strstr(url, "://")) {
-		fprintf(stderr, "\n%s: 无效的URL\n", url);
-		exit(2);
-	}
-	if (strlen(url) > 1500) {
-		fprintf(stderr,"URL长度过长\n");
-		exit(2);
-	}
-	if (proxy_host == NULL) {
-		//忽略大小写比较前7位
-		if (0 != strncasecmp("http://", url, 7)) {
-			fprintf(stderr,"\n无法解析URL(只支持HTTP协议, 暂不支持HTTPS协议)\n");
-			exit(2);
-		}
-	}
-	//定位url中主机名开始的位置
-	int i = strstr(url, "://") - url + 3;
-	//在主机名开始的位置是否有/ 没有则无效
-	if (strchr(url + i, '/') == NULL) {
-		fprintf(stderr,"\n无效的URL,主机名没有以'/'结尾\n");
-		exit(2);
-	}
-
-	//填写请求url 无代理时
-	if (proxy_host == NULL) {
-		//有端口号 填写端口号
-		if (index(url + i, ':') != NULL 
-			&& index(url + i, ':') < index(url + i, '/')) {
-			//设置域名或IP
-			strncpy(host, url + i, strchr(url + i, ':') - url - i);
-			char port_str[10];
-			bzero(port_str, 10);
-			strncpy(port_str, index(url + i, ':') + 1, strchr(url + i, '/') - index(url + i, ':') -1);
-			//设置端口
-			port = atoi(port_str);
-			//避免写了: 却没写端口号
-			if (port == 0) {
-				port = 80;
-			}
-		} else {
-			strncpy(host, url + i, strcspn(url + i, "/"));
-		}
-		strcat(request_buf + strlen(request_buf), url + i + strcspn(url + i, "/"));
-	} else {
-		//有代理服务器 直接填就行
-		strcat(request_buf, url);
-	}
-
-	//填写http协议版本
-	if (http_version == 0) {
-		strcat(request_buf, " HTTP/0.9");
-	} else if (http_version == 1) {
-		strcat(request_buf, " HTTP/1.0");
-	} else if (http_version == 2) {
-		strcat(request_buf, " HTTP/1.1");
-	}
-	strcat(request_buf, "\r\n");
-
-	//请求头部
-	if (http_version > 0) {
-		strcat(request_buf, "User-Agent: WebBench " WEBBENCH_VERSION "\r\n");
-	}
-	//域名或IP字段
-	if (proxy_host == NULL && http_version > 0) {
-		strcat(request_buf, "Host: ");
-		strcat(request_buf, host);
-		strcat(request_buf, "\r\n");
-	}
-	//强制重新加载, 无缓存字段
-	if (force_reload && proxy_host != NULL) {
-		strcat(request_buf, "Pragma: no-cache\r\n");
-	}
-	//keep alive
-	if (http_version > 1) {
-		strcat(request_buf, "Connection: ");
-		if (is_keep_alive) {
-			strcat(request_buf, "keep-alive\r\n");
-		} else {
-			strcat(request_buf, "close\r\n");
-		}
-	}
-	//添加空行
-	if (http_version > 0) {
-		strcat(request_buf, "\r\n"); 
-	}
-
-	printf("Requset: %s\n", request_buf);
-	PrintMessage(url);
-}
 
 //闹钟信号处理函数
 static void AlarmHandler(int signal) {
@@ -542,8 +326,226 @@ not_keep_alive:
     }
 }
 
+//命令行解析
+void ParseArg(int argc, char* argv[]) {
+	int opt = 0;
+	int options_index = 0;
+
+	//没有输入选项
+	if (argc == 1) {
+		Usage();
+		exit(1);
+	} 
+
+	//一个一个解析输入选项
+	while ((opt = getopt_long(argc, argv, "fr912kt:c:p:Vh?",
+								OPTIONS, &options_index)) != EOF) {
+		switch (opt) {
+			case 'f': 
+				force = 1;
+				break;
+			case 'r': 
+				force_reload = 1;
+				break; 
+			case '9': 
+				http_version = 0;
+				break;
+			case '1': 
+				http_version = 1;
+				break;
+			case '2': 
+				http_version = 2;
+				break;
+			case 'k':
+				is_keep_alive = 1;
+				break;
+			case 't': 
+				request_time = atoi(optarg);
+				break;	
+			case 'c': 
+				clients_num = atoi(optarg);
+				break;
+			case 'p': {
+				//使用代理服务器 设置其代理网络号和端口号
+				char* proxy = strrchr(optarg, ':');
+				proxy_host = optarg;
+				if (proxy == NULL) {
+					break;
+				}
+				if (proxy == optarg) {
+					fprintf(stderr,"选项参数错误, 代理服务器%s: 缺少主机名\n", optarg);
+					exit(1);
+				}
+				if (proxy == optarg + strlen(optarg) - 1) {
+					fprintf(stderr,"选项参数错误, 代理服务器%s: 缺少端口号\n", optarg);
+					exit(1);
+				}
+				*proxy = '\0';
+				port = atoi(proxy + 1);
+				break;
+			}
+			case '?':
+			case 'h': 
+				Usage();
+				exit(0);
+			case 'V': 
+				printf("WebBench %s\n", WEBBENCH_VERSION);
+				exit(0);
+			default:
+				Usage();
+				exit(1);
+		}
+	}
+
+	//没有输入URL
+	if (optind == argc) {
+		fprintf(stderr,"WebBench: 缺少URL参数!\n");
+		Usage();
+		exit(1);
+	}
+
+	//如果没有设置客户端数量和连接时间, 则设置默认
+	if (clients_num == 0) {
+		clients_num = 1;
+	}
+	if (request_time == 0) {
+		request_time = 30;
+	}
+}
+
+//构造请求
+void BuildRequest(const char* url) {
+	bzero(host, MAXHOSTNAMELEN);
+	bzero(request_buf, REQUEST_SIZE);
+
+	//无缓存和代理都要在http1.0以上才能使用
+	if (force_reload && proxy_host != NULL && http_version < 1) {
+		http_version = 1;
+	}
+	if (request_method == METHOD_HEAD && http_version < 1) {
+		http_version = 1;
+	}
+	//OPTIONS和TRACE要1.1
+	if (request_method == METHOD_OPTIONS && http_version < 2) {
+		http_version = 2;
+	}
+	if (request_method == METHOD_TRACE && http_version < 2) {
+		http_version = 2;
+	}
+
+	//http请求行 的请求方法
+	switch (request_method) {
+		case METHOD_GET: 
+			strcpy(request_buf, "GET");
+			break;
+		case METHOD_HEAD: 
+			strcpy(request_buf, "HEAD");
+			break;
+		case METHOD_OPTIONS: 
+			strcpy(request_buf, "OPTIONS");
+			break;
+		case METHOD_TRACE: 
+			strcpy(request_buf, "TRACE");
+			break;
+		default:
+			strcpy(request_buf, "GET");
+			break;
+	}
+	strcat(request_buf, " ");
+
+	//判断url是否有效
+	if (NULL == strstr(url, "://")) {
+		fprintf(stderr, "\n%s: 无效的URL\n", url);
+		exit(2);
+	}
+	if (strlen(url) > 1500) {
+		fprintf(stderr,"URL长度过长\n");
+		exit(2);
+	}
+	if (proxy_host == NULL) {
+		//忽略大小写比较前7位
+		if (0 != strncasecmp("http://", url, 7)) {
+			fprintf(stderr,"\n无法解析URL(只支持HTTP协议, 暂不支持HTTPS协议)\n");
+			exit(2);
+		}
+	}
+	//定位url中主机名开始的位置
+	int i = strstr(url, "://") - url + 3;
+	//在主机名开始的位置是否有/ 没有则无效
+	if (strchr(url + i, '/') == NULL) {
+		fprintf(stderr,"\n无效的URL,主机名没有以'/'结尾\n");
+		exit(2);
+	}
+
+	//填写请求url 无代理时
+	if (proxy_host == NULL) {
+		//有端口号 填写端口号
+		if (index(url + i, ':') != NULL 
+			&& index(url + i, ':') < index(url + i, '/')) {
+			//设置域名或IP
+			strncpy(host, url + i, strchr(url + i, ':') - url - i);
+			char port_str[10];
+			bzero(port_str, 10);
+			strncpy(port_str, index(url + i, ':') + 1, strchr(url + i, '/') - index(url + i, ':') -1);
+			//设置端口
+			port = atoi(port_str);
+			//避免写了: 却没写端口号
+			if (port == 0) {
+				port = 80;
+			}
+		} else {
+			strncpy(host, url + i, strcspn(url + i, "/"));
+		}
+		strcat(request_buf + strlen(request_buf), url + i + strcspn(url + i, "/"));
+	} else {
+		//有代理服务器 直接填就行
+		strcat(request_buf, url);
+	}
+
+	//填写http协议版本
+	if (http_version == 0) {
+		strcat(request_buf, " HTTP/0.9");
+	} else if (http_version == 1) {
+		strcat(request_buf, " HTTP/1.0");
+	} else if (http_version == 2) {
+		strcat(request_buf, " HTTP/1.1");
+	}
+	strcat(request_buf, "\r\n");
+
+	//请求头部
+	if (http_version > 0) {
+		strcat(request_buf, "User-Agent: WebBench " WEBBENCH_VERSION "\r\n");
+	}
+	//域名或IP字段
+	if (proxy_host == NULL && http_version > 0) {
+		strcat(request_buf, "Host: ");
+		strcat(request_buf, host);
+		strcat(request_buf, "\r\n");
+	}
+	//强制重新加载, 无缓存字段
+	if (force_reload && proxy_host != NULL) {
+		strcat(request_buf, "Pragma: no-cache\r\n");
+	}
+	//keep alive
+	if (http_version > 1) {
+		strcat(request_buf, "Connection: ");
+		if (is_keep_alive) {
+			strcat(request_buf, "keep-alive\r\n");
+		} else {
+			strcat(request_buf, "close\r\n");
+		}
+	}
+	//添加空行
+	if (http_version > 0) {
+		strcat(request_buf, "\r\n"); 
+	}
+
+	printf("Requset: %s\n", request_buf);
+	PrintMessage(url);
+}
+
 //父进程的作用: 创建子进程 读子进程测试到的数据 然后处理
-static void WebBench() {
+void WebBench() {
 	pid_t pid = 0;
 	FILE* pipe_fd = NULL;
 	int req_succ, req_fail, resp_bytes;
@@ -630,19 +632,5 @@ static void WebBench() {
 				(int)(total_bytes / (float)request_time),
 				success_count, failed_count);
 	}
-}
-
-int main(int argc, char* argv[]) {
-	//解析命令行参数
-	ParseArg(argc, argv);
-
-	//构造http请求报文 
-	const char* url = argv[optind];
-	BuildRequest(url);
-
-	//开始执行压力测试
-	WebBench();
-
-	return 0;
 }
 
