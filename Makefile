@@ -58,10 +58,12 @@ $(TARGET): $(MAIN_OBJ) $(STATIC_LIB)
 #声明这是伪目标文件
 .PHONY: all clean 
 
-install: $(STATIC_LIB) 
-	@if (test ! -d ./lib); then mkdir -p ./lib; fi
-	@mv $^ ./lib
+install: $(STATIC_LIB) $(TARGET) 
+	@if (test ! -d lib); then mkdir -p lib; fi
+	@mv $(STATIC_LIB) lib
+	@if (test ! -d bin); then mkdir -p bin; fi
+	@mv $(TARGET) bin
 
 clean:
-	rm -f $(OBJS) $(MAIN_OBJ) $(TARGET) $(STATIC_LIB) $(SHARED_LIB) ./lib/$(STATIC_LIB) ./lib/$(SHARED_LIB)
+	rm -f $(OBJS) $(MAIN_OBJ) $(TARGET) $(STATIC_LIB) $(SHARED_LIB) ./bin/$(TARGET) ./lib/$(STATIC_LIB) ./lib/$(SHARED_LIB)
 

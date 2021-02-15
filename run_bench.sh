@@ -1,6 +1,6 @@
 #!/bin/bash
 
-webbench=./web_bench
+webbench=./bin/web_bench
 #服务器地址
 server_ip=192.168.1.110
 server_port=8888
@@ -27,9 +27,6 @@ if [ $is_keep_alive -eq 1 ]
 then
     options="-k $options" 
 fi 
-
-#编译
-make clean && make -j8
 
 #删除之前开的进程
 kill -9 `ps -ef | grep web_bench | awk '{print $2}'`
