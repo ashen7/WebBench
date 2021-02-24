@@ -238,7 +238,7 @@ keep_alive:
                     } 
                     int read_bytes = read(client_sockfd, response_buf, response_size);
                     if (read_bytes < 0) { 
-                        cout << "3. 接收响应报文失败: " << strerror(errno) << endl;
+                        //cout << "3. 接收响应报文失败: " << strerror(errno) << endl;
                         failed_count++;
                         close(client_sockfd);
                         //读取响应失败 不用重新创套接字 重新发一次请求即可
@@ -267,7 +267,7 @@ not_keep_alive:
             //与服务器建立连接
             client_sockfd = ConnectServer(host, port);                          
             if (client_sockfd < 0) { 
-                cout << "1. 建立连接失败: " << strerror(errno) << endl; 
+                //cout << "1. 建立连接失败: " << strerror(errno) << endl; 
                 failed_count++; 
                 continue;
             } 
@@ -301,7 +301,7 @@ not_keep_alive:
                     } 
                     int read_bytes = read(client_sockfd, response_buf, response_size);
                     if (read_bytes < 0) { 
-                        cout << "3. 接收响应报文失败: " << strerror(errno) << endl;
+                        //cout << "3. 接收响应报文失败: " << strerror(errno) << endl;
                         failed_count++;
                         close(client_sockfd);
                         //这里读失败想退出来继续创建套接字 去请求服务器,因为有两层循环 所以用goto

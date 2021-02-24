@@ -7,11 +7,11 @@ server_port=8888
 url=http://${server_ip}:${server_port}/echo
 
 #子进程数量
-process_num=1
+process_num=1000
 #请求时间(单位s)
 request_time=60
 #keep-alive
-is_keep_alive=1
+is_keep_alive=0
 #force
 is_force=0
 
@@ -29,7 +29,7 @@ then
 fi 
 
 #删除之前开的进程
-kill -9 `ps -ef | grep web_bench | awk '{print $2}'`
+#kill -9 `ps -ef | grep web_bench | awk '{print $2}'`
 
 #运行
 $webbench $options

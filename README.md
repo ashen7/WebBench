@@ -1,25 +1,26 @@
-# WebBench
+# 开源压力测试工具WebBench
 
-## Introduction
+## 介绍
 * WebBench是Web性能压力测试工具。使用fork()系统调用创建多个子进程，模拟客户端去访问指定服务器。
 * 支持HTTP/0.9, HTTP/1.0, HTTP1.1请求，最终输出: 请求/秒，字节/秒。
 * 本项目使用C++11实现，核心实现在web_bench.cpp，可以生成静态库和动态库提供api调用，详细的中文注释。
-* 修复了WebBench connect()失败时sockfd泄漏的bug，以及连续read二次阻塞的bug。
+* 修复了WebBench connect()失败时sockfd泄漏的bug，以及读取响应报文时读完了依然read导致阻塞的bug(因为是BIO，读完了再读就会阻塞了)。
 * 支持HTTP1.1 Connection: keep-alive。
 
-官方主页：http://home.tiscali.cz/~cz210552/webbench.html
-
-## Envoirment
+## 环境
 * OS: Ubuntu 18.04
 * Compiler: g++ 7.5.0
+* Makefile: 4.1 
 
-## Build
+## 构建
+* 使用Makefile来build
     make -j8 && make install
-    也可以直接使用./build.sh
 
-## Usage
+* 直接运行脚本
+    ./build.sh
+
+## 运行
     ./web_bench [-c process_num] [t $request_time] url 
-    也可以修改run_bench.sh参数后直接运行
 
 ## 还有其他命令行选项：
 * -k:           keep-alive
