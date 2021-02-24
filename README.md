@@ -20,7 +20,7 @@
     ./build.sh
 
 ## 运行
-    ./web_bench [-c process_num] [t $request_time] url 
+    ./web_bench [-c process_num] [t request_time] url 
 
 ## 还有其他命令行选项：
 * -k:           keep-alive
