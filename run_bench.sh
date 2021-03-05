@@ -4,7 +4,7 @@ webbench=./bin/web_bench
 #服务器地址
 server_ip=192.168.1.110
 server_port=8888
-url=http://${server_ip}:${server_port}/echo
+url=http://${server_ip}:${server_port}/hello
 
 #子进程数量
 process_num=1000
